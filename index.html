@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1020" />
+  <title>Neon Snake</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #070b14;
+      --panel: rgba(14, 21, 38, 0.82);
+      --panel-strong: rgba(18, 28, 50, 0.96);
+      --line: rgba(255,255,255,.09);
+      --text: #f5f7ff;
+      --muted: #9aa6bf;
+      --snake: #6cf6a8;
+      --snake-head: #c7ffdf;
+      --food: #ff5d8f;
+      --accent: #77a7ff;
+      --shadow: 0 24px 80px rgba(0,0,0,.38);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body { min-height: 100%; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background:
+        radial-gradient(circle at 15% 20%, rgba(91, 135, 255, .18), transparent 28%),
+        radial-gradient(circle at 85% 80%, rgba(108, 246, 168, .13), transparent 30%),
+        linear-gradient(160deg, #070b14 0%, #0b1020 55%, #0a1324 100%);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow-x: hidden;
+    }
+
+    .app {
+      width: min(94vw, 720px);
+      display: grid;
+      gap: 16px;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: 20px;
+    }
+
+    .title-wrap h1 {
+      margin: 0;
+      font-size: clamp(28px, 6vw, 48px);
+      line-height: .95;
+      letter-spacing: -.05em;
+    }
+
+    .title-wrap p {
+      margin: 9px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .scoreboard {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .score-card {
+      min-width: 86px;
+      padding: 10px 14px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--panel);
+      backdrop-filter: blur(14px);
+      box-shadow: 0 12px 40px rgba(0,0,0,.18);
+    }
+
+    .score-card span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: .11em;
+      text-transform: uppercase;
+    }
+
+    .score-card strong {
+      display: block;
+      margin-top: 3px;
+      font-size: 24px;
+      line-height: 1;
+    }
+
+    .game-shell {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      border-radius: 28px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      background: rgba(6, 10, 19, .92);
+      box-shadow: var(--shadow), inset 0 1px rgba(255,255,255,.04);
+      touch-action: none;
+      user-select: none;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background: linear-gradient(rgba(4,8,16,.34), rgba(4,8,16,.72));
+      transition: opacity .18s ease;
+    }
+
+    .overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .overlay-card {
+      width: min(88%, 380px);
+      padding: 26px;
+      border-radius: 22px;
+      border: 1px solid var(--line);
+      background: var(--panel-strong);
+      box-shadow: 0 28px 90px rgba(0,0,0,.42);
+      text-align: center;
+      backdrop-filter: blur(16px);
+    }
+
+    .overlay-card h2 {
+      margin: 0;
+      font-size: 30px;
+      letter-spacing: -.035em;
+    }
+
+    .overlay-card p {
+      margin: 10px 0 20px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: 14px;
+      min-height: 46px;
+      padding: 0 18px;
+      color: #07101a;
+      background: linear-gradient(180deg, #92ffc3, #62e89f);
+      font: inherit;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 12px 30px rgba(98,232,159,.22);
+      transition: transform .14s ease, filter .14s ease;
+    }
+
+    button:hover { filter: brightness(1.04); transform: translateY(-1px); }
+    button:active { transform: translateY(1px) scale(.99); }
+
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .secondary {
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid var(--line);
+      box-shadow: none;
+    }
+
+    .mobile-pad {
+      display: none;
+      grid-template-columns: repeat(3, 56px);
+      grid-template-rows: repeat(2, 48px);
+      gap: 8px;
+      justify-content: center;
+    }
+
+    .mobile-pad button {
+      min-height: 48px;
+      padding: 0;
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid var(--line);
+      box-shadow: none;
+      font-size: 18px;
+    }
+
+    .mobile-pad .up { grid-column: 2; }
+    .mobile-pad .left { grid-column: 1; grid-row: 2; }
+    .mobile-pad .down { grid-column: 2; grid-row: 2; }
+    .mobile-pad .right { grid-column: 3; grid-row: 2; }
+
+    .footer {
+      text-align: center;
+      color: #6f7c96;
+      font-size: 12px;
+    }
+
+    @media (max-width: 620px) {
+      body { padding: 16px 12px 24px; place-items: start center; }
+      .app { width: 100%; }
+      .topbar { align-items: start; flex-direction: column; }
+      .scoreboard { width: 100%; justify-content: stretch; }
+      .score-card { flex: 1; }
+      .game-shell { border-radius: 22px; }
+      .controls { grid-template-columns: 1fr; }
+      .mobile-pad { display: grid; }
+      .hint { text-align: center; }
+      .secondary { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div class="title-wrap">
+        <h1>Neon Snake</h1>
+        <p>经典贪吃蛇 · 吃得越多，速度越快。</p>
+      </div>
+      <div class="scoreboard" aria-label="游戏分数">
+        <div class="score-card">
+          <span>Score</span>
+          <strong id="score">0</strong>
+        </div>
+        <div class="score-card">
+          <span>Best</span>
+          <strong id="best">0</strong>
+        </div>
+      </div>
+    </header>
+
+    <section class="game-shell" id="gameShell" aria-label="贪吃蛇游戏区域">
+      <canvas id="game" width="720" height="720"></canvas>
+      <div class="overlay" id="overlay">
+        <div class="overlay-card">
+          <h2 id="overlayTitle">准备好了吗？</h2>
+          <p id="overlayText">使用方向键或 WASD 控制方向。手机上可以滑动屏幕或使用下方方向键。</p>
+          <button id="primaryButton">开始游戏</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="controls">
+      <div class="hint">方向键 / WASD 控制 · Space 暂停 · R 重新开始</div>
+      <button class="secondary" id="pauseButton">暂停</button>
+    </section>
+
+    <section class="mobile-pad" aria-label="移动端方向控制">
+      <button class="up" data-dir="up" aria-label="向上">↑</button>
+      <button class="left" data-dir="left" aria-label="向左">←</button>
+      <button class="down" data-dir="down" aria-label="向下">↓</button>
+      <button class="right" data-dir="right" aria-label="向右">→</button>
+    </section>
+
+    <div class="footer">Built for GitHub Pages · No backend required</div>
+  </main>
+
+  <script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const shell = document.getElementById('gameShell');
+    const scoreEl = document.getElementById('score');
+    const bestEl = document.getElementById('best');
+    const overlay = document.getElementById('overlay');
+    const overlayTitle = document.getElementById('overlayTitle');
+    const overlayText = document.getElementById('overlayText');
+    const primaryButton = document.getElementById('primaryButton');
+    const pauseButton = document.getElementById('pauseButton');
+
+    const GRID = 24;
+    const START_SPEED = 125;
+    const MIN_SPEED = 62;
+
+    let snake;
+    let food;
+    let direction;
+    let queuedDirection;
+    let score;
+    let best = Number(localStorage.getItem('neonSnakeBest') || 0);
+    let tickMs;
+    let timer = null;
+    let running = false;
+    let paused = false;
+    let gameOver = false;
+    let touchStart = null;
+
+    bestEl.textContent = best;
+
+    function resetState() {
+      snake = [
+        { x: 12, y: 12 },
+        { x: 11, y: 12 },
+        { x: 10, y: 12 }
+      ];
+      direction = { x: 1, y: 0 };
+      queuedDirection = { x: 1, y: 0 };
+      score = 0;
+      tickMs = START_SPEED;
+      running = false;
+      paused = false;
+      gameOver = false;
+      scoreEl.textContent = '0';
+      pauseButton.textContent = '暂停';
+      placeFood();
+      draw();
+    }
+
+    function placeFood() {
+      const free = [];
+      for (let y = 0; y < GRID; y++) {
+        for (let x = 0; x < GRID; x++) {
+          if (!snake?.some(part => part.x === x && part.y === y)) free.push({ x, y });
+        }
+      }
+      food = free[Math.floor(Math.random() * free.length)] || { x: 5, y: 5 };
+    }
+
+    function showOverlay(title, text, buttonText) {
+      overlayTitle.textContent = title;
+      overlayText.textContent = text;
+      primaryButton.textContent = buttonText;
+      overlay.classList.remove('hidden');
+    }
+
+    function hideOverlay() {
+      overlay.classList.add('hidden');
+    }
+
+    function startGame() {
+      clearTimeout(timer);
+      if (gameOver) resetState();
+      running = true;
+      paused = false;
+      gameOver = false;
+      pauseButton.textContent = '暂停';
+      hideOverlay();
+      scheduleTick();
+    }
+
+    function restartGame() {
+      clearTimeout(timer);
+      resetState();
+      startGame();
+    }
+
+    function togglePause() {
+      if (gameOver) return;
+      if (!running) {
+        startGame();
+        return;
+      }
+      paused = !paused;
+      clearTimeout(timer);
+      if (paused) {
+        pauseButton.textContent = '继续';
+        showOverlay('已暂停', '按 Space、点击继续，或者直接使用方向键恢复游戏。', '继续游戏');
+      } else {
+        pauseButton.textContent = '暂停';
+        hideOverlay();
+        scheduleTick();
+      }
+    }
+
+    function scheduleTick() {
+      clearTimeout(timer);
+      if (!running || paused || gameOver) return;
+      timer = setTimeout(() => {
+        tick();
+        scheduleTick();
+      }, tickMs);
+    }
+
+    function tick() {
+      direction = queuedDirection;
+      const head = snake[0];
+      const next = { x: head.x + direction.x, y: head.y + direction.y };
+
+      const hitsWall = next.x < 0 || next.y < 0 || next.x >= GRID || next.y >= GRID;
+      const hitsSelf = snake.some(part => part.x === next.x && part.y === next.y);
+
+      if (hitsWall || hitsSelf) {
+        endGame();
+        return;
+      }
+
+      snake.unshift(next);
+
+      if (next.x === food.x && next.y === food.y) {
+        score += 10;
+        scoreEl.textContent = String(score);
+        if (score > best) {
+          best = score;
+          bestEl.textContent = String(best);
+          localStorage.setItem('neonSnakeBest', String(best));
+        }
+        tickMs = Math.max(MIN_SPEED, START_SPEED - Math.floor(score / 40) * 7);
+        placeFood();
+      } else {
+        snake.pop();
+      }
+
+      draw();
+    }
+
+    function endGame() {
+      clearTimeout(timer);
+      running = false;
+      gameOver = true;
+      draw();
+      showOverlay('游戏结束', `本局得分 ${score}。最高分 ${best}。`, '再来一局');
+    }
+
+    function setDirection(next) {
+      const isOpposite = next.x === -direction.x && next.y === -direction.y;
+      if (isOpposite) return;
+      queuedDirection = next;
+      if (paused) {
+        paused = false;
+        running = true;
+        pauseButton.textContent = '暂停';
+        hideOverlay();
+        scheduleTick();
+      }
+    }
+
+    function directionFromName(name) {
+      return {
+        up: { x: 0, y: -1 },
+        down: { x: 0, y: 1 },
+        left: { x: -1, y: 0 },
+        right: { x: 1, y: 0 }
+      }[name];
+    }
+
+    function resizeCanvas() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const size = Math.max(320, Math.floor(shell.clientWidth));
+      canvas.width = Math.floor(size * dpr);
+      canvas.height = Math.floor(size * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      draw();
+    }
+
+    function roundedRect(x, y, w, h, r) {
+      const radius = Math.min(r, w / 2, h / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.arcTo(x + w, y, x + w, y + h, radius);
+      ctx.arcTo(x + w, y + h, x, y + h, radius);
+      ctx.arcTo(x, y + h, x, y, radius);
+      ctx.arcTo(x, y, x + w, y, radius);
+      ctx.closePath();
+    }
+
+    function draw() {
+      if (!snake || !food) return;
+      const size = shell.clientWidth;
+      const cell = size / GRID;
+
+      ctx.clearRect(0, 0, size, size);
+
+      const bg = ctx.createLinearGradient(0, 0, size, size);
+      bg.addColorStop(0, '#07101a');
+      bg.addColorStop(1, '#0a1423');
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, size, size);
+
+      ctx.strokeStyle = 'rgba(255,255,255,.025)';
+      ctx.lineWidth = 1;
+      for (let i = 1; i < GRID; i++) {
+        const p = Math.round(i * cell) + .5;
+        ctx.beginPath(); ctx.moveTo(p, 0); ctx.lineTo(p, size); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, p); ctx.lineTo(size, p); ctx.stroke();
+      }
+
+      const fx = food.x * cell;
+      const fy = food.y * cell;
+      ctx.save();
+      ctx.shadowColor = '#ff5d8f';
+      ctx.shadowBlur = cell * .7;
+      ctx.fillStyle = '#ff5d8f';
+      ctx.beginPath();
+      ctx.arc(fx + cell / 2, fy + cell / 2, cell * .28, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      snake.forEach((part, index) => {
+        const pad = index === 0 ? cell * .12 : cell * .16;
+        const x = part.x * cell + pad;
+        const y = part.y * cell + pad;
+        const w = cell - pad * 2;
+        const h = cell - pad * 2;
+        ctx.save();
+        if (index === 0) {
+          ctx.shadowColor = '#91ffc1';
+          ctx.shadowBlur = cell * .5;
+          ctx.fillStyle = '#c7ffdf';
+        } else {
+          const alpha = Math.max(.38, 1 - index / Math.max(12, snake.length * 1.15));
+          ctx.fillStyle = `rgba(108, 246, 168, ${alpha})`;
+        }
+        roundedRect(x, y, w, h, cell * .22);
+        ctx.fill();
+        ctx.restore();
+      });
+
+      if (gameOver) {
+        ctx.fillStyle = 'rgba(255,255,255,.025)';
+        ctx.fillRect(0, 0, size, size);
+      }
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+
+    window.addEventListener('keydown', (event) => {
+      const key = event.key.toLowerCase();
+      const keys = {
+        arrowup: 'up', w: 'up',
+        arrowdown: 'down', s: 'down',
+        arrowleft: 'left', a: 'left',
+        arrowright: 'right', d: 'right'
+      };
+
+      if (keys[key]) {
+        event.preventDefault();
+        if (!running && !gameOver) startGame();
+        setDirection(directionFromName(keys[key]));
+      } else if (key === ' ') {
+        event.preventDefault();
+        togglePause();
+      } else if (key === 'r') {
+        restartGame();
+      }
+    });
+
+    shell.addEventListener('pointerdown', (event) => {
+      touchStart = { x: event.clientX, y: event.clientY };
+    });
+
+    shell.addEventListener('pointerup', (event) => {
+      if (!touchStart) return;
+      const dx = event.clientX - touchStart.x;
+      const dy = event.clientY - touchStart.y;
+      touchStart = null;
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
+      if (!running && !gameOver) startGame();
+      if (Math.abs(dx) > Math.abs(dy)) {
+        setDirection(directionFromName(dx > 0 ? 'right' : 'left'));
+      } else {
+        setDirection(directionFromName(dy > 0 ? 'down' : 'up'));
+      }
+    });
+
+    document.querySelectorAll('[data-dir]').forEach(button => {
+      button.addEventListener('click', () => {
+        if (!running && !gameOver) startGame();
+        setDirection(directionFromName(button.dataset.dir));
+      });
+    });
+
+    primaryButton.addEventListener('click', () => {
+      if (paused) togglePause();
+      else if (gameOver) restartGame();
+      else startGame();
+    });
+
+    pauseButton.addEventListener('click', togglePause);
+
+    resetState();
+    resizeCanvas();
+  </script>
+</body>
+</html>
